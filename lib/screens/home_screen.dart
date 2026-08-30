@@ -7,8 +7,10 @@ import '../repositories/conta_repository.dart';
 import '../models/tipo_transacao.dart';
 import '../models/categoria.dart';
 import '../models/sub_categoria.dart';
+import '../models/lancamento.dart';
 import '../repositories/categoria_repository.dart';
 import '../repositories/tipo_transacao_repository.dart';
+import '../repositories/lancamento_repository.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,11 +35,12 @@ class _HomeScreenState extends State<HomeScreen> {
   TipoTransacao? _tipoTransacaoSelecionada;
 
   final CategoriaRepository _categoriaRepo = CategoriaRepository();
-
   List<Categoria> _categorias = [];
   List<SubCategoria> _subCategorias = [];
   Categoria? _categoriaSelecionada;
   SubCategoria? _subCategoriaSelecionada;
+
+  final LancamentoRepository _lancamentoRepo = LancamentoRepository();
 
   @override
   void initState() {
@@ -104,31 +107,56 @@ class _HomeScreenState extends State<HomeScreen> {
     _carregarTiposTransacao();
   }
 
-  void _salvarTransacao() {
-    // 1. Validação básica de segurança
-    if (_categoriaSelecionada == null || _valorController.text == '0,00') {
+  Future<void> _salvarTransacao() async {
+    // 1. Validação de segurança
+    if (_categoriaSelecionada == null ||
+        _contaSelecionada == null ||
+        _tipoTransacaoSelecionada == null ||
+        _valorController.text == '0,00') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Preencha o valor e selecione uma categoria!'),
+          content: Text('Preencha o valor e selecione as opções obrigatórias!'),
           backgroundColor: AppColors.error,
         ),
       );
       return;
     }
 
-    // AQUI ENTRARÁ O CÓDIGO DE SALVAR NO BANCO DE DADOS (SQLite)
-    // Vamos fazer isso no próximo passo para não misturar!
+    // 2. Converte o valor de texto ("8.000,00") para double (8000.00)
+    String valorLimpo = _valorController.text
+        .replaceAll('.', '')
+        .replaceAll(',', '.');
+    double valorConvertido = double.parse(valorLimpo);
 
-    // 2. Mostra a mensagem de sucesso
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Transação salva com sucesso! 🚀'),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating, // Fica flutuando bonitinho na tela
-      ),
+    // 3. Monta o objeto (AJUSTE OS NOMES DOS CAMPOS CONFORME SEU MODEL)
+    final novoLancamento = Lancamento(
+      valor: valorConvertido,
+      isSaida: _isDespesa ? 1 : 0, // Adapte caso seu banco use boolean
+      dataLancamento: DateTime.now()
+          .toIso8601String(), // Adapte se usar DateTime direto
+      contaId: _contaSelecionada!.id!,
+      categoriaId: _categoriaSelecionada!.id!,
+      subCategoriaId: _subCategoriaSelecionada!.id!,
+      tipoTransacaoId: _tipoTransacaoSelecionada!.id!,
     );
 
-    // 3. Limpa a tela
+    // 4. Salva no banco!
+    await _lancamentoRepo.insert(
+      novoLancamento,
+    ); // Ajuste o nome da função do repo se necessário
+
+    // 5. Mostra o sucesso
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Transação salva com sucesso! 🚀'),
+          backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    // 6. Limpa a tela
     _limparFormulario();
   }
 
