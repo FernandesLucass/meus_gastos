@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:meus_gastos/models/conta.dart';
 
 import '../core/app_colors.dart';
 import '../core/app_typography.dart';
+import '../repositories/conta_repository.dart';
+import '../models/tipo_transacao.dart';
+import '../models/categoria.dart';
+import '../models/sub_categoria.dart';
+import '../repositories/categoria_repository.dart';
+import '../repositories/tipo_transacao_repository.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -11,29 +18,119 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _valorController = TextEditingController(
+    text: '0,00',
+  );
   // Variáveis para controlar os estados da tela
   bool _isDespesa = true;
-  String _contaSelecionada = 'Nubank';
-  final List<String> _contas = [
-    'Nubank',
-    'Caixa',
-    'Carteira',
-    'Flash',
-    'Méliuz',
-    'Mercado Pago',
-    'Next',
-    'Viacredi',
-  ];
-  String _transacaoSelecionada = 'Cartão de Crédito';
-  final List<String> _transacoes = [
-    'Cartão de Crédito',
-    'Cartão de Débito',
-    'Pix',
-    'Transferência',
-    'Dinheiro',
-  ];
-  String? _categoriaSelecionada = 'Supermercado & Alimentação';
-  String? _subCategoriaSelecionada = 'Padaria';
+
+  final ContaRepository _contaRepo = ContaRepository();
+  List<Conta> _contas = [];
+  Conta? _contaSelecionada; // Trocamos de String para o objeto Conta
+
+  final TipoTransacaoRepository _tipoTransacaoRepo = TipoTransacaoRepository();
+  List<TipoTransacao> _tiposTransacao = [];
+  TipoTransacao? _tipoTransacaoSelecionada;
+
+  final CategoriaRepository _categoriaRepo = CategoriaRepository();
+
+  List<Categoria> _categorias = [];
+  List<SubCategoria> _subCategorias = [];
+  Categoria? _categoriaSelecionada;
+  SubCategoria? _subCategoriaSelecionada;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarCategorias(); // Puxa os dados logo que a tela abre
+    _carregarContas();
+    _carregarTiposTransacao();
+  }
+
+  Future<void> _carregarContas() async {
+    // Supondo que seu repo tenha um método getAll ou similar que traga ordenado por ID
+    final contasBanco = await _contaRepo.getAll();
+    setState(() {
+      _contas = contasBanco;
+      if (_contas.isNotEmpty) {
+        // Já deixa o Nubank (primeiro da lista) selecionado por padrão!
+        _contaSelecionada = _contas.first;
+      }
+    });
+  }
+
+  Future<void> _carregarCategorias() async {
+    // Busca no banco: 1 se for Despesa, 0 se for Receita
+    final tipo = _isDespesa ? 1 : 0;
+    final categoriasBanco = await _categoriaRepo.getByTipo(tipo);
+
+    setState(() {
+      _categorias = categoriasBanco;
+      // Limpa as seleções e a lista de subcategorias ao trocar o tipo!
+      _categoriaSelecionada = null;
+      _subCategoriaSelecionada = null;
+      _subCategorias = [];
+    });
+  }
+
+  Future<void> _carregarSubCategorias(int categoriaId) async {
+    final subBanco = await _categoriaRepo.getSubCategorias(categoriaId);
+    setState(() {
+      _subCategorias = subBanco;
+      _subCategoriaSelecionada =
+          null; // Reseta a subcategoria ao trocar de categoria
+    });
+  }
+
+  Future<void> _carregarTiposTransacao() async {
+    final tiposBanco = await _tipoTransacaoRepo.getAll();
+    setState(() {
+      _tiposTransacao = tiposBanco;
+      if (_tiposTransacao.isNotEmpty) {
+        _tipoTransacaoSelecionada = _tiposTransacao.first;
+      }
+    });
+  }
+
+  void _limparFormulario() {
+    setState(() {
+      _valorController.text = '0,00';
+      _isDespesa = true;
+    });
+    // Como a função abaixo já limpa a categoria e subcategoria e busca as despesas,
+    // basta chamá-la aqui para resetar o resto da tela!
+    _carregarCategorias();
+    _carregarContas();
+    _carregarTiposTransacao();
+  }
+
+  void _salvarTransacao() {
+    // 1. Validação básica de segurança
+    if (_categoriaSelecionada == null || _valorController.text == '0,00') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Preencha o valor e selecione uma categoria!'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // AQUI ENTRARÁ O CÓDIGO DE SALVAR NO BANCO DE DADOS (SQLite)
+    // Vamos fazer isso no próximo passo para não misturar!
+
+    // 2. Mostra a mensagem de sucesso
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Transação salva com sucesso! 🚀'),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating, // Fica flutuando bonitinho na tela
+      ),
+    );
+
+    // 3. Limpa a tela
+    _limparFormulario();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(24.0),
         children: [
-          // 1. CABEÇALHO (Manteve igual)
+          // 1. CABEÇALHO
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -78,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 10),
 
-          // 2. CARD DO VALOR (Manteve igual)
+          // 2. CARD DO VALOR
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -96,13 +193,61 @@ class _HomeScreenState extends State<HomeScreen> {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(
-                      '\$ ',
+                      'R\$ ',
                       style: AppTypography.amount.copyWith(
                         fontSize: 28,
                         color: AppColors.textSecondary,
                       ),
                     ),
-                    const Text('0.00', style: AppTypography.amount),
+                    IntrinsicWidth(
+                      child: TextField(
+                        controller: _valorController,
+                        keyboardType: TextInputType
+                            .number, // Chama o teclado numérico do celular
+                        style: AppTypography.amount,
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        onChanged: (value) {
+                          // 1. Remove tudo que não for número
+                          String apenasNumeros = value.replaceAll(
+                            RegExp(r'[^0-9]'),
+                            '',
+                          );
+                          if (apenasNumeros.isEmpty) apenasNumeros = '0';
+
+                          // 2. Divide por 100 para criar os centavos reais
+                          double valor = double.parse(apenasNumeros) / 100;
+
+                          // 3. Separa os reais dos centavos
+                          List<String> partes = valor
+                              .toStringAsFixed(2)
+                              .split('.');
+
+                          // 4. Adiciona o ponto de milhar na parte dos reais (Regex mágica)
+                          String reais = partes[0].replaceAllMapped(
+                            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                            (Match m) => '${m[1]}.',
+                          );
+
+                          // 5. Junta tudo formatado: Reais + Vírgula + Centavos
+                          String valorFormatado = '$reais,${partes[1]}';
+
+                          // 6. Atualiza o campo mantendo o cursor sempre no final
+                          _valorController.value = TextEditingValue(
+                            text: valorFormatado,
+                            selection: TextSelection.collapsed(
+                              offset: valorFormatado.length,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -110,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 10),
 
-          // 3. SELETOR DE DESPESA / RECEITA COM ANIMAÇÃO
+          // 3. SELETOR DE DESPESA / RECEITA
           Container(
             height: 52,
             padding: const EdgeInsets.all(4),
@@ -141,9 +286,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Os textos clicáveis por cima
                 Row(
                   children: [
+                    // 1. CAIXINHA DA DESPESA
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _isDespesa = true),
+                        onTap: () {
+                          if (!_isDespesa) {
+                            setState(() => _isDespesa = true);
+                            _carregarCategorias();
+                          }
+                        },
                         behavior: HitTestBehavior.opaque,
                         child: Center(
                           child: Text(
@@ -161,9 +312,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+
+                    // 2. CAIXINHA DA RECEITA
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => setState(() => _isDespesa = false),
+                        onTap: () {
+                          if (_isDespesa) {
+                            setState(() => _isDespesa = false);
+                            _carregarCategorias();
+                          }
+                        },
                         behavior: HitTestBehavior.opaque,
                         child: Center(
                           child: Text(
@@ -193,13 +351,13 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('CONTA / BANCO', style: AppTypography.label),
-              const SizedBox(height: 1),
+              const SizedBox(height: 2),
               Wrap(
-                spacing: 2.0, // Espaçamento horizontal
-                runSpacing: 2.0, // Espaçamento vertical
-                direction: Axis.horizontal,
+                spacing: 2.0,
+                runSpacing: 2.0,
                 children: _contas.map((conta) {
-                  final isSelected = _contaSelecionada == conta;
+                  // Compara pelo ID para saber qual está selecionada
+                  final isSelected = _contaSelecionada?.id == conta.id;
                   return GestureDetector(
                     onTap: () {
                       setState(() {
@@ -209,8 +367,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 16,
+                        vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
@@ -222,7 +380,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             : Border.all(color: AppColors.border),
                       ),
                       child: Text(
-                        conta,
+                        conta.nome, // Mostra o nome vindo do banco
                         style: TextStyle(
                           fontFamily: AppTypography.fontFamily,
                           fontWeight: isSelected
@@ -247,17 +405,17 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('TIPO DA TRANSAÇÃO', style: AppTypography.label),
-              const SizedBox(height: 1),
+              const SizedBox(height: 2),
               Wrap(
-                spacing: 2.0, // Espaçamento horizontal
-                runSpacing: 2.0, // Espaçamento vertical
+                spacing: 2.0,
+                runSpacing: 2.0,
                 direction: Axis.horizontal,
-                children: _transacoes.map((transacao) {
-                  final isSelected = _transacaoSelecionada == transacao;
+                children: _tiposTransacao.map((tipo) {
+                  final isSelected = _tipoTransacaoSelecionada?.id == tipo.id;
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        _transacaoSelecionada = transacao;
+                        _tipoTransacaoSelecionada = tipo;
                       });
                     },
                     child: AnimatedContainer(
@@ -276,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             : Border.all(color: AppColors.border),
                       ),
                       child: Text(
-                        transacao,
+                        tipo.nome, // Puxa o nome direto do objeto
                         style: TextStyle(
                           fontFamily: AppTypography.fontFamily,
                           fontWeight: isSelected
@@ -301,27 +459,27 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('CATEGORIA', style: AppTypography.label),
-              DropdownButtonFormField<String>(
+              const SizedBox(height: 2),
+              DropdownButtonFormField<Categoria>(
                 initialValue: _categoriaSelecionada,
                 icon: const Icon(
                   Icons.keyboard_arrow_down,
                   color: AppColors.textSecondary,
                 ),
-                items:
-                    [
-                      'Supermercado & Alimentação',
-                      'Transporte',
-                      'Restaurantes',
-                    ].map((String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value, style: AppTypography.input),
-                      );
-                    }).toList(),
-                onChanged: (newValue) {
+                hint: const Text('Selecione uma categoria'),
+                items: _categorias.map((Categoria cat) {
+                  return DropdownMenuItem<Categoria>(
+                    value: cat,
+                    child: Text(cat.nome, style: AppTypography.input),
+                  );
+                }).toList(),
+                onChanged: (novaCategoria) {
                   setState(() {
-                    _categoriaSelecionada = newValue;
+                    _categoriaSelecionada = novaCategoria;
                   });
+                  if (novaCategoria != null) {
+                    _carregarSubCategorias(novaCategoria.id!);
+                  }
                 },
               ),
             ],
@@ -333,23 +491,29 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text('SUBCATEGORIA', style: AppTypography.label),
-              DropdownButtonFormField<String>(
+              const SizedBox(height: 2),
+              DropdownButtonFormField<SubCategoria>(
                 initialValue: _subCategoriaSelecionada,
                 icon: const Icon(
                   Icons.keyboard_arrow_down,
                   color: AppColors.textSecondary,
                 ),
-                items: ['Padaria', 'Açougue', 'Feira'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value, style: AppTypography.input),
-                  );
-                }).toList(),
-                onChanged: (newValue) {
-                  setState(() {
-                    _subCategoriaSelecionada = newValue;
-                  });
-                },
+                hint: const Text('Selecione uma subcategoria'), // Se não tiver subcategorias, passa null para desabilitar o campo
+                items: _subCategorias.isEmpty
+                    ? null
+                    : _subCategorias.map((SubCategoria sub) {
+                        return DropdownMenuItem<SubCategoria>(
+                          value: sub,
+                          child: Text(sub.nome, style: AppTypography.input),
+                        );
+                      }).toList(),
+                onChanged: _subCategorias.isEmpty
+                    ? null
+                    : (novaSub) {
+                        setState(() {
+                          _subCategoriaSelecionada = novaSub;
+                        });
+                      },
               ),
             ],
           ),
@@ -357,13 +521,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // 8. BOTÃO SALVAR TRANSAÇÃO
           ElevatedButton(
-            onPressed: () {
-              // A lógica de salvar no banco vem na próxima etapa!
-            },
+            onPressed: _salvarTransacao, // Chamamos a função aqui!
             child: const Text('Salvar Transação'),
           ),
 
-          // 8. BOTÃO SINCRONIZAR COM GOOGLE SHEETS
+          // 9. BOTÃO SINCRONIZAR COM GOOGLE SHEETS
           TextButton.icon(
             onPressed: () {
               // Projeto para o futuro! rs
@@ -385,8 +547,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ), // Deixa o botão largo e clicável
             ),
           ),
-
-          const SizedBox(height: 10), // Um respiro no final da rolagem da tela
         ],
       ),
     );

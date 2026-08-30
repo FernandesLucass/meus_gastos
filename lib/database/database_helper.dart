@@ -107,13 +107,13 @@ class DatabaseHelper {
 
     // 1. Inserindo Contas Padrão
     final contasIniciais = [
-      'Carteira',
       'Nubank',
-      'Caixa',
+      'Flash',
+      'Mercado Pago',
       'Méliuz',
       'Viacredi',
-      'Mercado Pago',
-      'Flash',
+      'Caixa',
+      'Carteira',
       'Next',
     ];
     for (var conta in contasIniciais) {
@@ -122,9 +122,9 @@ class DatabaseHelper {
 
     // 2. Inserindo Tipos de Transação
     final tiposIniciais = [
-      'Pix',
       'Cartão de Crédito',
       'Cartão de Débito',
+      'Pix',
       'Transferência',
       'Dinheiro',
     ];
