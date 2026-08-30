@@ -1,15 +1,21 @@
+// 1. Flutter & Pacotes
 import 'package:flutter/material.dart';
-import 'package:meus_gastos/models/conta.dart';
 
+// 2. Core (Tema & Cores)
 import '../core/app_colors.dart';
 import '../core/app_typography.dart';
-import '../repositories/conta_repository.dart';
+
+// 3. Models
+import '../models/conta.dart';
 import '../models/tipo_transacao.dart';
 import '../models/categoria.dart';
 import '../models/sub_categoria.dart';
 import '../models/lancamento.dart';
-import '../repositories/categoria_repository.dart';
+
+// 4. Repositories
+import '../repositories/conta_repository.dart';
 import '../repositories/tipo_transacao_repository.dart';
+import '../repositories/categoria_repository.dart';
 import '../repositories/lancamento_repository.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,27 +26,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  // 1. Controladores
   final TextEditingController _valorController = TextEditingController(
     text: '0,00',
   );
-  // Variáveis para controlar os estados da tela
-  bool _isDespesa = true;
 
+  // 2. Repositórios (Comunicação com SQLite)
   final ContaRepository _contaRepo = ContaRepository();
-  List<Conta> _contas = [];
-  Conta? _contaSelecionada; // Trocamos de String para o objeto Conta
-
   final TipoTransacaoRepository _tipoTransacaoRepo = TipoTransacaoRepository();
-  List<TipoTransacao> _tiposTransacao = [];
-  TipoTransacao? _tipoTransacaoSelecionada;
-
   final CategoriaRepository _categoriaRepo = CategoriaRepository();
+  final LancamentoRepository _lancamentoRepo = LancamentoRepository();
+
+  // 3. Listas carregadas do Banco
+  List<Conta> _contas = [];
+  List<TipoTransacao> _tiposTransacao = [];
   List<Categoria> _categorias = [];
   List<SubCategoria> _subCategorias = [];
+
+  // 4. Estado da Seleção Atual
+  bool _isDespesa = true;
+  Conta? _contaSelecionada; // Trocamos de String para o objeto Conta
+  TipoTransacao? _tipoTransacaoSelecionada;
   Categoria? _categoriaSelecionada;
   SubCategoria? _subCategoriaSelecionada;
 
-  final LancamentoRepository _lancamentoRepo = LancamentoRepository();
+  //Métodos:
 
   @override
   void initState() {
@@ -48,6 +58,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _carregarCategorias(); // Puxa os dados logo que a tela abre
     _carregarContas();
     _carregarTiposTransacao();
+  }
+
+  @override
+  void dispose() {
+    _valorController.dispose(); // Libera a memória do controlador do teclado
+    super.dispose();
   }
 
   Future<void> _carregarContas() async {
@@ -58,6 +74,16 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_contas.isNotEmpty) {
         // Já deixa o Nubank (primeiro da lista) selecionado por padrão!
         _contaSelecionada = _contas.first;
+      }
+    });
+  }
+
+  Future<void> _carregarTiposTransacao() async {
+    final tiposBanco = await _tipoTransacaoRepo.getAll();
+    setState(() {
+      _tiposTransacao = tiposBanco;
+      if (_tiposTransacao.isNotEmpty) {
+        _tipoTransacaoSelecionada = _tiposTransacao.first;
       }
     });
   }
@@ -83,28 +109,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _subCategoriaSelecionada =
           null; // Reseta a subcategoria ao trocar de categoria
     });
-  }
-
-  Future<void> _carregarTiposTransacao() async {
-    final tiposBanco = await _tipoTransacaoRepo.getAll();
-    setState(() {
-      _tiposTransacao = tiposBanco;
-      if (_tiposTransacao.isNotEmpty) {
-        _tipoTransacaoSelecionada = _tiposTransacao.first;
-      }
-    });
-  }
-
-  void _limparFormulario() {
-    setState(() {
-      _valorController.text = '0,00';
-      _isDespesa = true;
-    });
-    // Como a função abaixo já limpa a categoria e subcategoria e busca as despesas,
-    // basta chamá-la aqui para resetar o resto da tela!
-    _carregarCategorias();
-    _carregarContas();
-    _carregarTiposTransacao();
   }
 
   Future<void> _salvarTransacao() async {
@@ -160,11 +164,23 @@ class _HomeScreenState extends State<HomeScreen> {
     _limparFormulario();
   }
 
+  void _limparFormulario() {
+    setState(() {
+      _valorController.text = '0,00';
+      _isDespesa = true;
+    });
+    // Como a função abaixo já limpa a categoria e subcategoria e busca as despesas,
+    // basta chamá-la aqui para resetar o resto da tela!
+    _carregarCategorias();
+    _carregarContas();
+    _carregarTiposTransacao();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: ListView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
         children: [
           // 1. CABEÇALHO
           Row(
@@ -549,7 +565,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // 8. BOTÃO SALVAR TRANSAÇÃO
           ElevatedButton(
-            onPressed: _salvarTransacao, // Chamamos a função aqui!
+            onPressed: _salvarTransacao, // Chama a função.
             child: const Text('Salvar Transação'),
           ),
 
