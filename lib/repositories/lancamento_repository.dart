@@ -41,8 +41,8 @@ class LancamentoRepository {
   }
 
   Future<List<Map<String, dynamic>>> getLancamentosSemana() async {
-    final db = await DatabaseHelper.instance.database; 
-    
+    final db = await DatabaseHelper.instance.database;
+
     // Adicionamos os JOINs da conta e do tipo de transação
     final List<Map<String, dynamic>> result = await db.rawQuery('''
       SELECT 
@@ -60,7 +60,40 @@ class LancamentoRepository {
       ORDER BY l.data_lancamento DESC
       LIMIT 15
     ''');
-    
+
+    return result;
+  }
+
+  Future<List<Map<String, dynamic>>> getLancamentosPorMes(
+    int ano,
+    int mes,
+  ) async {
+    final db = await DatabaseHelper.instance.database;
+
+    // Formata o mês para ficar com dois dígitos (ex: 08)
+    String mesFormatado = mes.toString().padLeft(2, '0');
+    String dataFiltro = '$ano-$mesFormatado%';
+
+    final List<Map<String, dynamic>> result = await db.rawQuery(
+      '''
+      SELECT 
+        l.id, 
+        l.valor, 
+        l.is_saida, 
+        l.data_lancamento, 
+        c.nome AS categoria_nome,
+        co.nome AS conta_nome,
+        t.nome AS tipo_transacao_nome
+      FROM lancamentos l
+      INNER JOIN categorias c ON l.categoria_id = c.id
+      INNER JOIN contas co ON l.conta_id = co.id
+      INNER JOIN tipos_transacao t ON l.tipo_transacao_id = t.id
+      WHERE l.data_lancamento LIKE ?
+      ORDER BY l.data_lancamento DESC
+    ''',
+      [dataFiltro],
+    );
+
     return result;
   }
 }

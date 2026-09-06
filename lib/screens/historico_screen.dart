@@ -17,24 +17,85 @@ class HistoricoScreen extends StatefulWidget {
 }
 
 class _HistoricoScreenState extends State<HistoricoScreen> {
-  // 1. Controladores
+  // 1. Controladores e Estado
   final LancamentoRepository _lancamentoRepo = LancamentoRepository();
   List<Map<String, dynamic>> _lancamentos = [];
   bool _isLoading = true;
+
+  // NOVAS VARIÁVEIS PARA O SELETOR DE MÊS
+  final DateTime _dataAtual = DateTime.now();
+  late DateTime _mesSelecionado;
+
+  final List<String> _nomesMeses = [
+    'Janeiro',
+    'Fevereiro',
+    'Março',
+    'Abril',
+    'Maio',
+    'Junho',
+    'Julho',
+    'Agosto',
+    'Setembro',
+    'Outubro',
+    'Novembro',
+    'Dezembro',
+  ];
 
   // Métodos:
   @override
   void initState() {
     super.initState();
+    // Começa no mês atual (Ano, Mês, Dia 1 para evitar bugs de virada de mês)
+    _mesSelecionado = DateTime(_dataAtual.year, _dataAtual.month, 1);
     _carregarLancamentos();
   }
 
+  // --- Adicione junto das suas outras variáveis ---
+  double _totalReceitas = 0.0;
+  double _totalDespesas = 0.0;
+  double _saldo = 0.0;
+
+  // --- Substitua o método _carregarLancamentos ---
   Future<void> _carregarLancamentos() async {
-    final dados = await _lancamentoRepo.getLancamentosSemana();
+    // Agora enviamos o ano e o mês para o banco!
+    final dados = await _lancamentoRepo.getLancamentosPorMes(
+      _mesSelecionado.year,
+      _mesSelecionado.month,
+    );
+
+    double receitas = 0.0;
+    double despesas = 0.0;
+
+    // Calcula os totais
+    for (var item in dados) {
+      if (item['is_saida'] == 1) {
+        despesas += item['valor'];
+      } else {
+        receitas += item['valor'];
+      }
+    }
+
     setState(() {
       _lancamentos = dados;
+      _totalReceitas = receitas;
+      _totalDespesas = despesas;
+      _saldo = receitas - despesas;
       _isLoading = false;
     });
+  }
+
+  String _formatarMoeda(double valor) {
+    // Separa a parte inteira dos centavos
+    final partes = valor.abs().toStringAsFixed(2).split('.');
+
+    // Adiciona o ponto a cada 3 casas (milhar)
+    final inteiro = partes[0].replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (m) => '.',
+    );
+
+    // Junta tudo com a vírgula
+    return '$inteiro,${partes[1]}';
   }
 
   // 2. Build
@@ -45,8 +106,10 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildCabecalho(),
+          _buildSeletorMes(),
+          _buildResumoMes(),
+          const SizedBox(height: 10),
           _buildListaTransacoes(),
-          _buildBotaoHistoricoCompleto(),
         ],
       ),
     );
@@ -57,7 +120,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
   // 1. CABEÇALHO
   Widget _buildCabecalho() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -84,6 +147,194 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     );
   }
 
+  Widget _buildSeletorMes() {
+    // Verifica se o mês selecionado é anterior ao mês/ano atual para habilitar o botão de avançar
+    bool podeAvancar = _mesSelecionado.isBefore(
+      DateTime(_dataAtual.year, _dataAtual.month, 1),
+    );
+    String nomeMes = _nomesMeses[_mesSelecionado.month - 1];
+    String ano = _mesSelecionado.year.toString();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Botão Voltar (Sempre ativo)
+            IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 18,
+              ),
+              onPressed: () {
+                setState(() {
+                  _mesSelecionado = DateTime(
+                    _mesSelecionado.year,
+                    _mesSelecionado.month - 1,
+                    1,
+                  );
+                  _isLoading = true;
+                });
+                _carregarLancamentos(); // Recarrega os dados do novo mês
+              },
+            ),
+
+            // Texto do Mês/Ano
+            Text(
+              '$nomeMes $ano',
+              style: const TextStyle(
+                fontFamily: AppTypography.fontFamily,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.white,
+              ),
+            ),
+
+            // Botão Avançar (Ativo apenas se puder avançar)
+            IconButton(
+              icon: Icon(
+                Icons.arrow_forward_ios,
+                color: podeAvancar
+                    ? Colors.white
+                    : AppColors.textSecondary.withValues(alpha: 0.3),
+                size: 18,
+              ),
+              onPressed: podeAvancar
+                  ? () {
+                      setState(() {
+                        _mesSelecionado = DateTime(
+                          _mesSelecionado.year,
+                          _mesSelecionado.month + 1,
+                          1,
+                        );
+                        _isLoading = true;
+                      });
+                      _carregarLancamentos(); // Recarrega os dados do novo mês
+                    }
+                  : null, // null desabilita o botão nativamente
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResumoMes() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // RECEITAS
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RECEITAS',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: AppTypography.fontFamily,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '+ R\$ ${_formatarMoeda(_totalReceitas)}',
+                    style: const TextStyle(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: AppTypography.fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Container(width: 1, height: 30, color: AppColors.border),
+            const SizedBox(width: 12),
+
+            // DESPESAS
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'DESPESAS',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: AppTypography.fontFamily,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '- R\$ ${_formatarMoeda(_totalDespesas)}',
+                    style: const TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: AppTypography.fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Container(width: 1, height: 30, color: AppColors.border),
+            const SizedBox(width: 12),
+
+            // SALDO
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SALDO',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: AppTypography.fontFamily,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'R\$ ${_formatarMoeda(_saldo)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFamily: AppTypography.fontFamily,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // 2. LISTA DE TRANSAÇÕES
   Widget _buildListaTransacoes() {
     return Expanded(
@@ -97,10 +348,57 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: _lancamentos.length,
               itemBuilder: (context, index) {
                 final item = _lancamentos[index];
+
+                // Pega a data do item atual
+                final dataDateTime = DateTime.parse(item['data_lancamento']);
+                final dataAtualFormatada =
+                    "${dataDateTime.day.toString().padLeft(2, '0')}/${dataDateTime.month.toString().padLeft(2, '0')}";
+
+                bool mostrarCabecalho = false;
+
+                // Se for o primeiro item, sempre mostra o cabeçalho
+                if (index == 0) {
+                  mostrarCabecalho = true;
+                } else {
+                  // Compara com a data do item anterior
+                  final dataAnterior = DateTime.parse(
+                    _lancamentos[index - 1]['data_lancamento'],
+                  );
+                  final dataAnteriorFormatada =
+                      "${dataAnterior.day.toString().padLeft(2, '0')}/${dataAnterior.month.toString().padLeft(2, '0')}";
+
+                  if (dataAtualFormatada != dataAnteriorFormatada) {
+                    mostrarCabecalho = true;
+                  }
+                }
+
+                // Se mudou o dia, retorna o título da data + o seu card perfeito
+                if (mostrarCabecalho) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 5, bottom: 2),
+                        child: Text(
+                          dataAtualFormatada,
+                          style: const TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                      _buildCardTransacao(item),
+                    ],
+                  );
+                }
+
+                // Se for o mesmo dia, retorna só o card
                 return _buildCardTransacao(item);
               },
             ),
@@ -130,7 +428,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
 
     // 4. Desenho do Card
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 5),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -138,6 +436,7 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
         border: Border.all(color: AppColors.border),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Ícone
           Container(
@@ -151,13 +450,16 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
           ),
           const SizedBox(width: 12),
 
-          // Textos Centrais
+          // Resto do Card (Textos e Valor)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 1. Categoria (Agora tem 100% do espaço horizontal livre)
                 Text(
                   categoriaNome,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontFamily: AppTypography.fontFamily,
                     fontWeight: FontWeight.w600,
@@ -165,77 +467,62 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  dataFormatada,
-                  style: TextStyle(
-                    fontFamily: AppTypography.fontFamily,
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  "$contaNome | $tipoTransacaoNome",
-                  style: TextStyle(
-                    fontFamily: AppTypography.fontFamily,
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
+                const SizedBox(height: 4),
+
+                // 2. Linha Inferior (Data/Conta na esquerda, Valor na direita)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Textos secundários
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            dataFormatada,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            "$contaNome | $tipoTransacaoNome",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: AppTypography.fontFamily,
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Valor (Agora posicionado mais abaixo)
+                    Text(
+                      "${isSaida ? '- ' : '+ '}R\$ ${_formatarMoeda(valor)}",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTypography.fontFamily,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: isSaida ? AppColors.error : AppColors.success,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-
-          // Valor
-          Text(
-            "${isSaida ? '- ' : '+ '}R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}",
-            style: TextStyle(
-              fontFamily: AppTypography.fontFamily,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-              color: isSaida ? AppColors.error : AppColors.success,
-            ),
-          ),
         ],
-      ),
-    );
-  }
-
-  // 4. BOTÃO "VER HISTÓRICO COMPLETO"
-  Widget _buildBotaoHistoricoCompleto() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () {
-            // Futuramente: Navigator.push para a tela do Mês Inteiro
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.surface,
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: AppColors.border),
-            ),
-          ),
-          child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Ver Histórico Completo',
-                style: TextStyle(
-                  fontFamily: AppTypography.fontFamily,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(width: 8),
-              Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white),
-            ],
-          ),
-        ),
       ),
     );
   }
