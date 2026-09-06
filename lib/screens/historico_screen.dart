@@ -1,6 +1,7 @@
 // 1. Flutter & Pacotes
 import 'package:flutter/material.dart';
 
+import '../widgets/editar_lancamento_modal.dart'; // <-- IMPORT DO MODAL DE EDIÇÃO
 // 2. Core (Tema & Cores)
 import '../core/app_colors.dart';
 import '../core/app_typography.dart';
@@ -96,6 +97,18 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
 
     // Junta tudo com a vírgula
     return '$inteiro,${partes[1]}';
+  }
+
+  void _abrirModalEdicao(Map<String, dynamic> item) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => EditarLancamentoModal(
+        item: item,
+        onAtualizado: _carregarLancamentos, // Atualiza a tela ao fechar
+      ),
+    );
   }
 
   // 2. Build
@@ -406,8 +419,9 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
   }
 
   // 3. CARD DE TRANSAÇÃO
+  // 3. CARD DE TRANSAÇÃO
   Widget _buildCardTransacao(Map<String, dynamic> item) {
-    // 1. Extração de dados
+    // 1. Extração de dados (SEMPRE VEM PRIMEIRO)
     final isSaida = item['is_saida'] == 1;
     final valor = item['valor'] as double;
     final categoriaNome = item['categoria_nome'] as String;
@@ -426,103 +440,106 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
             ? CategoryIcons.icones['GENERIC_SAIDA']
             : CategoryIcons.icones['GENERIC_ENTRADA']);
 
-    // 4. Desenho do Card
-    return Container(
-      margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Ícone
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(12),
+    // 4. Desenho do Card (O RETURN VEM POR ÚLTIMO)
+    return GestureDetector(
+      onTap: () => _abrirModalEdicao(item), // <-- ADICIONAMOS O CLIQUE AQUI
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 5),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Ícone
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icone, color: Colors.white, size: 20),
             ),
-            child: Icon(icone, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          // Resto do Card (Textos e Valor)
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 1. Categoria (Agora tem 100% do espaço horizontal livre)
-                Text(
-                  categoriaNome,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontFamily: AppTypography.fontFamily,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Colors.white,
+            // Resto do Card (Textos e Valor)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Categoria
+                  Text(
+                    categoriaNome,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: AppTypography.fontFamily,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
+                  const SizedBox(height: 4),
 
-                // 2. Linha Inferior (Data/Conta na esquerda, Valor na direita)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    // Textos secundários
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            dataFormatada,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: AppTypography.fontFamily,
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                  // 2. Linha Inferior
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      // Textos secundários
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              dataFormatada,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            "$contaNome | $tipoTransacaoNome",
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: AppTypography.fontFamily,
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
+                            const SizedBox(height: 2),
+                            Text(
+                              "$contaNome | $tipoTransacaoNome",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: AppTypography.fontFamily,
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
+                      const SizedBox(width: 8),
 
-                    // Valor (Agora posicionado mais abaixo)
-                    Text(
-                      "${isSaida ? '- ' : '+ '}R\$ ${_formatarMoeda(valor)}",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: AppTypography.fontFamily,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: isSaida ? AppColors.error : AppColors.success,
+                      // Valor
+                      Text(
+                        "${isSaida ? '- ' : '+ '}R\$ ${_formatarMoeda(valor)}",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppTypography.fontFamily,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: isSaida ? AppColors.error : AppColors.success,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

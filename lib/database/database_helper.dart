@@ -96,6 +96,7 @@ class DatabaseHelper {
         tipo_transacao_id INTEGER NOT NULL,
         categoria_id INTEGER NOT NULL,
         sub_categoria_id INTEGER NOT NULL,
+        sincronizado INTEGER DEFAULT 0,
         FOREIGN KEY (conta_id) REFERENCES contas (id),
         FOREIGN KEY (tipo_transacao_id) REFERENCES tipos_transacao (id),
         FOREIGN KEY (categoria_id) REFERENCES categorias (id),

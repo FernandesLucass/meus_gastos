@@ -46,10 +46,15 @@ class LancamentoRepository {
     // Adicionamos os JOINs da conta e do tipo de transação
     final List<Map<String, dynamic>> result = await db.rawQuery('''
       SELECT 
-        l.id, 
+        l.id,
+        l.sincronizado,
         l.valor, 
         l.is_saida, 
         l.data_lancamento, 
+        l.conta_id,
+        l.tipo_transacao_id,
+        l.categoria_id,
+        l.sub_categoria_id,
         c.nome AS categoria_nome,
         co.nome AS conta_nome,
         t.nome AS tipo_transacao_nome
@@ -78,9 +83,14 @@ class LancamentoRepository {
       '''
       SELECT 
         l.id, 
+        l.sincronizado,
         l.valor, 
         l.is_saida, 
         l.data_lancamento, 
+        l.conta_id,
+        l.tipo_transacao_id,
+        l.categoria_id,
+        l.sub_categoria_id,
         c.nome AS categoria_nome,
         co.nome AS conta_nome,
         t.nome AS tipo_transacao_nome
@@ -95,5 +105,34 @@ class LancamentoRepository {
     );
 
     return result;
+  }
+
+  Future<int> atualizarLancamentoCompleto(
+    int id,
+    double valor,
+    int isSaida,
+    int categoriaId,
+    int contaId,
+    int tipoTransacaoId,
+    int subCategoriaId,
+  ) async {
+    final db = await DatabaseHelper.instance.database;
+
+    return await db.rawUpdate(
+      '''
+      UPDATE lancamentos 
+      SET valor = ?, is_saida = ?, categoria_id = ?, conta_id = ?, tipo_transacao_id = ?, sub_categoria_id = ?
+      WHERE id = ?
+    ''',
+      [
+        valor,
+        isSaida,
+        categoriaId,
+        contaId,
+        tipoTransacaoId,
+        subCategoriaId,
+        id,
+      ],
+    );
   }
 }
