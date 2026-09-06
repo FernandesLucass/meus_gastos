@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Categoria? _categoriaSelecionada;
   SubCategoria? _subCategoriaSelecionada;
 
-  //Métodos:
+  // Métodos:
 
   @override
   void initState() {

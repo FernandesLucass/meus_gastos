@@ -14,6 +14,9 @@ class AppColors {
   static const Color error = Color(
     0xFFEF4444,
   ); // red-500 (bolinha de notificação)
+  static const Color success = Color(
+    0xFF10B981,
+  ); // Verde esmeralda para entradas
 
   // Textos
   static const Color textPrimary = Colors.white;
