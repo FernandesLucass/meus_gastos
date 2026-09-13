@@ -18,6 +18,11 @@ import '../repositories/tipo_transacao_repository.dart';
 import '../repositories/categoria_repository.dart';
 import '../repositories/lancamento_repository.dart';
 
+// 5. Services
+import '../services/sincronizacao_service.dart';
+
+// -----------------------------------------------------------------------------
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -50,6 +55,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Categoria? _categoriaSelecionada;
   SubCategoria? _subCategoriaSelecionada;
 
+  int _qtdPendentes = 0;
+
+  // Cria essa função para o app saber quantos faltam
+  Future<void> _checarPendentes() async {
+    final pendentes = await _lancamentoRepo.getLancamentosParaSincronizar();
+    setState(() {
+      _qtdPendentes = pendentes.length;
+    });
+  }
+
   // Métodos:
 
   @override
@@ -58,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _carregarCategorias(); // Puxa os dados logo que a tela abre
     _carregarContas();
     _carregarTiposTransacao();
+    _checarPendentes();
   }
 
   @override
@@ -162,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 6. Limpa a tela
     _limparFormulario();
+    await _checarPendentes();
   }
 
   void _limparFormulario() {
@@ -174,6 +191,124 @@ class _HomeScreenState extends State<HomeScreen> {
     _carregarCategorias();
     _carregarContas();
     _carregarTiposTransacao();
+  }
+
+  void _confirmarSincronizacao() async {
+    // 1. Abre o modal e ESPERA a resposta do usuário
+    final bool? confirmou = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (BuildContext modalContext) {
+        // Renomeado para não dar conflito
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Sincronizar $_qtdPendentes transações?',
+                style: const TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Estes lançamentos serão enviados para a sua planilha de Controle Financeiro no Google Sheets.',
+                style: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // BOTÕES
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      // Retorna FALSE ou null
+                      onPressed: () => Navigator.pop(modalContext, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      // Retorna TRUE para a tela principal
+                      onPressed: () => Navigator.pop(modalContext, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sincronizar',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    // 2. O modal já fechou. Se o usuário clicou em "Sincronizar" (true), fazemos o trabalho aqui!
+    if (confirmou == true) {
+      if (!mounted) {
+        return;
+      } // Segurança para saber se a Home Screen ainda existe
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sincronizando com a planilha...')),
+      );
+
+      final sucesso = await SincronizacaoService().sincronizar();
+
+      if (!mounted) return;
+
+      if (sucesso) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sincronização concluída com sucesso!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+        // Agora sim a tela principal será atualizada corretamente!
+        await _checarPendentes();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao sincronizar. Tente novamente.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -571,24 +706,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // 9. BOTÃO SINCRONIZAR COM GOOGLE SHEETS
           TextButton.icon(
-            onPressed: () {
-              // Projeto para o futuro! rs
-            },
-            icon: const Icon(Icons.sync, color: AppColors.primary, size: 18),
-            label: const Text(
+            // Se tiver pendentes, abre o modal. Se for 0, fica null (desabilitado)
+            onPressed: _qtdPendentes > 0 ? _confirmarSincronizacao : null,
+            icon: Icon(
+              Icons.sync,
+              color: _qtdPendentes > 0
+                  ? AppColors.primary
+                  : AppColors.textSecondary,
+              size: 18,
+            ),
+            label: Text(
               'Sincronizar com Google Sheets',
               style: TextStyle(
                 fontFamily: AppTypography.fontFamily,
-                fontWeight: FontWeight.w600, // SemiBold
-                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+                color: _qtdPendentes > 0
+                    ? AppColors.primary
+                    : AppColors.textSecondary,
                 fontSize: 14,
               ),
             ),
             style: TextButton.styleFrom(
-              minimumSize: const Size(
-                double.infinity,
-                48,
-              ), // Deixa o botão largo e clicável
+              minimumSize: const Size(double.infinity, 48),
             ),
           ),
         ],

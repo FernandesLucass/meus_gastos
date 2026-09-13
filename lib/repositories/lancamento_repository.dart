@@ -147,4 +147,36 @@ class LancamentoRepository {
       ids,
     );
   }
+
+  // 1. Busca quem tem sincronizado == 0
+  Future<List<Map<String, dynamic>>> getLancamentosParaSincronizar() async {
+    final db = await DatabaseHelper.instance.database;
+
+    return await db.rawQuery('''
+      SELECT 
+        l.id,
+        l.valor, 
+        l.is_saida, 
+        l.data_lancamento, 
+        c.nome AS categoria_nome,
+        co.nome AS conta_nome,
+        sc.nome AS sub_categoria_nome
+      FROM lancamentos l
+      LEFT JOIN categorias c ON l.categoria_id = c.id
+      LEFT JOIN contas co ON l.conta_id = co.id
+      LEFT JOIN sub_categorias sc ON l.sub_categoria_id = sc.id
+      WHERE l.sincronizado = 0
+    ''');
+  }
+
+  // 2. Atualiza a flag para 1 após o sucesso
+  Future<int> marcarComoSincronizados(List<int> ids) async {
+    final db = await DatabaseHelper.instance.database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+
+    return await db.rawUpdate(
+      'UPDATE lancamentos SET sincronizado = 1 WHERE id IN ($placeholders)',
+      ids,
+    );
+  }
 }
