@@ -42,6 +42,18 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     'Dezembro',
   ];
 
+  final Set<int> _selecionados = {};
+
+  void _toggleSelecao(int id) {
+    setState(() {
+      if (_selecionados.contains(id)) {
+        _selecionados.remove(id);
+      } else {
+        _selecionados.add(id);
+      }
+    });
+  }
+
   // Métodos:
   @override
   void initState() {
@@ -111,6 +123,154 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     );
   }
 
+  void _confirmarExclusaoEmLote() {
+    // 1. Filtra na lista apenas os itens que estão selecionados
+    final itensSelecionados = _lancamentos
+        .where((l) => _selecionados.contains(l['id']))
+        .toList();
+
+    // 2. Conta quantos desses já foram sincronizados
+    final qtdSincronizados = itensSelecionados
+        .where((l) => l['sincronizado'] == 1)
+        .length;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Excluir ${_selecionados.length} transações?',
+                style: const TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // AVISO INTELIGENTE: Só aparece se houver dados sincronizados
+              if (qtdSincronizados > 0)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(
+                      alpha: 0.1,
+                    ), // Usando o seu novo padrão!
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.orange,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '$qtdSincronizados transação(ões) selecionada(s) já estão na planilha. Elas serão apagadas apenas no celular.',
+                          style: TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            color: Colors.orange[200],
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              const Text(
+                'Esta ação não pode ser desfeita.',
+                style: TextStyle(
+                  fontFamily: AppTypography.fontFamily,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // BOTÕES
+              Row(
+                children: [
+                  // BOTÃO CANCELAR
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Cancelar',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+
+                  // BOTÃO EXCLUIR
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        // 1. Converte o Set de selecionados para uma Lista de inteiros
+                        final idsParaExcluir = _selecionados.toList();
+
+                        // 2. Manda o repositório apagar no banco
+                        await _lancamentoRepo.excluirLancamentosEmLote(
+                          idsParaExcluir,
+                        );
+
+                        // 3. Limpa a seleção e fecha o modal
+                        setState(() {
+                          _selecionados.clear();
+                        });
+                        if (context.mounted) Navigator.pop(context);
+
+                        // 4. Recarrega a tela para os itens sumirem e o resumo atualizar
+                        _carregarLancamentos();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Excluir',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // 2. Build
   @override
   Widget build(BuildContext context) {
@@ -132,8 +292,44 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
 
   // 1. CABEÇALHO
   Widget _buildCabecalho() {
+    // Se tiver itens selecionados, mostra a barra de exclusão
+    if (_selecionados.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 5),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: () => setState(() => _selecionados.clear()),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${_selecionados.length} selecionados',
+                  style: const TextStyle(
+                    fontFamily: AppTypography.fontFamily,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+              onPressed:
+                  _confirmarExclusaoEmLote, // Chamamos a nova função aqui!
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Se não, mostra o cabeçalho padrão
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -419,7 +615,6 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
   }
 
   // 3. CARD DE TRANSAÇÃO
-  // 3. CARD DE TRANSAÇÃO
   Widget _buildCardTransacao(Map<String, dynamic> item) {
     // 1. Extração de dados (SEMPRE VEM PRIMEIRO)
     final isSaida = item['is_saida'] == 1;
@@ -427,6 +622,9 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
     final categoriaNome = item['categoria_nome'] as String;
     final contaNome = item['conta_nome'] as String;
     final tipoTransacaoNome = item['tipo_transacao_nome'] as String;
+    final bool isSelecionado = _selecionados.contains(item['id']);
+    // Extraindo o status de sincronização
+    final bool isSincronizado = item['sincronizado'] == 1;
 
     // 2. Formatação da Data
     final dataDateTime = DateTime.parse(item['data_lancamento']);
@@ -442,15 +640,30 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
 
     // 4. Desenho do Card (O RETURN VEM POR ÚLTIMO)
     return GestureDetector(
-      onTap: () => _abrirModalEdicao(item), // <-- ADICIONAMOS O CLIQUE AQUI
+      onLongPress: () => _toggleSelecao(item['id']),
+      onTap: () {
+        if (_selecionados.isNotEmpty) {
+          // Se já tem algo selecionado, o clique normal apenas seleciona mais itens
+          _toggleSelecao(item['id']);
+        } else {
+          // Se não, abre a edição normal
+          _abrirModalEdicao(item);
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 5),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          // Muda o fundo e a borda se estiver selecionado
+          color: isSelecionado
+              ? Colors.white.withValues(alpha: 0.1)
+              : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: isSelecionado ? Colors.white : AppColors.border,
+          ),
         ),
+
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -471,17 +684,36 @@ class _HistoricoScreenState extends State<HistoricoScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 1. Categoria
-                  Text(
-                    categoriaNome,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: AppTypography.fontFamily,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: Colors.white,
-                    ),
+                  // 1. Categoria e Ícone de Sincronização
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          categoriaNome,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: AppTypography.fontFamily,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // O pequeno ícone de status
+                      Icon(
+                        isSincronizado
+                            ? Icons.check_circle
+                            : Icons.access_time_filled,
+                        color: isSincronizado
+                            ? AppColors.success
+                            : Colors.amber,
+                        size: 14,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
 

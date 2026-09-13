@@ -135,4 +135,16 @@ class LancamentoRepository {
       ],
     );
   }
+
+  Future<int> excluirLancamentosEmLote(List<int> ids) async {
+    final db = await DatabaseHelper.instance.database;
+
+    // Cria as interrogações de acordo com a quantidade de IDs (ex: "?, ?, ?")
+    final placeholders = List.filled(ids.length, '?').join(',');
+
+    return await db.rawDelete(
+      'DELETE FROM lancamentos WHERE id IN ($placeholders)',
+      ids,
+    );
+  }
 }
