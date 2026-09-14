@@ -160,11 +160,13 @@ class LancamentoRepository {
         l.data_lancamento, 
         c.nome AS categoria_nome,
         co.nome AS conta_nome,
-        sc.nome AS sub_categoria_nome
+        sc.nome AS sub_categoria_nome,
+        tt.nome AS tipo_transacao_nome -- NOVO CAMPO
       FROM lancamentos l
       LEFT JOIN categorias c ON l.categoria_id = c.id
       LEFT JOIN contas co ON l.conta_id = co.id
       LEFT JOIN sub_categorias sc ON l.sub_categoria_id = sc.id
+      LEFT JOIN tipos_transacao tt ON l.tipo_transacao_id = tt.id
       WHERE l.sincronizado = 0
     ''');
   }
