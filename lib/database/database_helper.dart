@@ -116,6 +116,7 @@ class DatabaseHelper {
       'Caixa',
       'Carteira',
       'Next',
+      'Amazon',
     ];
     for (var conta in contasIniciais) {
       await db.insert('contas', {'nome': conta});
@@ -274,6 +275,7 @@ class DatabaseHelper {
         "Roupas",
         "Uniformes",
       ],
+      "Ajuste de Saldo": ["Ajuste de Saldo"],
     };
 
     // Laço para varrer o Map e inserir tudo dinamicamente

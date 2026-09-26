@@ -546,7 +546,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
+                        horizontal: 14,
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
@@ -600,8 +600,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
+                        horizontal: 14,
+                        vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
