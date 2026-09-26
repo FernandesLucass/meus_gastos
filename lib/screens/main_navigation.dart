@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_colors.dart';
 import 'home_screen.dart';
 import 'historico_screen.dart';
+import 'configuracoes_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -55,7 +56,7 @@ class _MainNavigationState extends State<MainNavigation> {
           HomeScreen(),
           HistoricoScreen(),
           Center(child: Text('Tela de Análise')),
-          Center(child: Text('Tela de Configurações')),
+          ConfiguracoesScreen(),
         ],
       ),
       bottomNavigationBar: Container(
