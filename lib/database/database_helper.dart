@@ -325,6 +325,7 @@ class DatabaseHelper {
         "Horas Extras",
         "Salário Fixo",
       ],
+      "Ajuste de Saldo": ["Ajuste de Saldo"],
     };
 
     // Laço para inserir as entradas dinamicamente
